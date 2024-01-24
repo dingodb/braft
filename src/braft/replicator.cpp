@@ -1849,7 +1849,7 @@ void BatchHeartbeatClosure::Run() {
                 *task.response = batch_response.responses(i);
                 task.done->Run();
             } else {
-                task.cntl->SetFailed("BatchHeartbeat individual group failed, " + status.error_msg());
+                task.cntl->SetFailed(status.error_code(), "BatchHeartbeat individual group failed [%s]" , status.error_msg().c_str());
                 task.done->Run();
             }
         }

@@ -164,8 +164,14 @@ void RaftServiceImpl::batch_append_entries(google::protobuf::RpcController* cntl
             continue;
         }
 
-        // prepare status for response
-        node->handle_append_entries_request(&cntl, &req, response->add_responses(), nullptr);
+        // for batch append_entries, we must set the required field before return
+        // the BatchAppendEntries closure will passthrough the cntl failed code and
+        // msg to each group, so the response can be set safely and to match proto2
+        // required field check in the BatchAppendEntriesResponse
+        auto *individual_response = response->add_responses();
+        individual_response->set_success(false);
+
+        node->handle_append_entries_request(&cntl, &req, individual_response, nullptr);
         if(cntl.Failed()) {
             status.set_error_code(cntl.ErrorCode());
             status.set_error_msg(cntl.ErrorText());
