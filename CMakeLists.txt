@@ -223,7 +223,10 @@ else()
 endif()
 endmacro(use_cxx11)
 
-use_cxx11()
+include(CheckCXXCompilerFlag)
+if (NOT CMAKE_CXX_STANDARD)
+    use_cxx11()
+endif()
 
 add_subdirectory(src)
 if(BUILD_UNIT_TESTS)
