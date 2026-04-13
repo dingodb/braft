@@ -129,7 +129,7 @@ void RaftServiceImpl::append_entries(google::protobuf::RpcController* cntl_base,
     }
 
     int entries_size = request->entries_size();
-    const std::string& group_id = request->group_id();
+    const std::string group_id = request->group_id();
     node->handle_append_entries_request(cntl, request, response,
                                         done_guard.release());
     BRAFT_LATENCY_END(
