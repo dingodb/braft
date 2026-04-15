@@ -22,6 +22,7 @@
 #include <butil/file_util.h>                         // butil::CreateDirectory
 #include <gflags/gflags.h>
 #include <brpc/reloadable_flags.h>
+#include <atomic>
 #include <memory>
 #include "braft/util.h"
 #include "braft/protobuf_file.h"
@@ -47,12 +48,19 @@ BRPC_VALIDATE_GFLAG(raft_meta_write_batch, brpc::PositiveInteger);
 // not adjust these parameters arbitrarily; rather, they configure specific parameters tailored to
 // the requirements of each distinct operational scenario.
 
+
+// Set to true after the first KVBasedMergedMetaStorageImpl::init() completes.
+// Validators use this to distinguish startup-time flag setting (allowed) from
+// post-init runtime changes (rejected).
+static std::atomic<bool> g_raft_meta_initialized{false};
+
 DEFINE_bool(raft_meta_enable_leveldb_tuning, false,
              "Tune LevelDB options for raft meta DB (write_buffer_size, max_open_files, etc.). "
              "Takes effect only at init() time; cannot be changed at runtime.");
 // LevelDB options are applied once during DB::Open, runtime changes have no effect.
 static bool validate_raft_meta_enable_leveldb_tuning(const char*, bool val) {
-    if (val != FLAGS_raft_meta_enable_leveldb_tuning) {
+    if (g_raft_meta_initialized.load(std::memory_order_acquire) &&
+        val != FLAGS_raft_meta_enable_leveldb_tuning) {
         LOG(ERROR) << "raft_meta_enable_leveldb_tuning cannot be changed at runtime. "
                    << "LevelDB options are applied only during init(). "
                    << "Please set this flag at startup.";
@@ -86,7 +94,8 @@ DEFINE_bool(raft_meta_periodic_sync_enabled, false,
 // because the timer is not created/destroyed dynamically, so we reject any
 // runtime modification to avoid giving users a false sense of control.
 static bool validate_raft_meta_periodic_sync_enabled(const char*, bool val) {
-    if (val != FLAGS_raft_meta_periodic_sync_enabled) {
+    if (g_raft_meta_initialized.load(std::memory_order_acquire) &&
+        val != FLAGS_raft_meta_periodic_sync_enabled) {
         LOG(ERROR) << "raft_meta_periodic_sync_enabled cannot be changed at runtime. "
                    << "The periodic sync timer is created only during init(). "
                    << "Please set this flag at startup.";
@@ -865,6 +874,7 @@ butil::Status KVBasedMergedMetaStorageImpl::init() {
     }
 
     _is_inited = true;
+    g_raft_meta_initialized.store(true, std::memory_order_release);
     return status;
 }
 
